@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monthly Calendar in Spring Boot/Java (Open-Source)</title>
+
+  <link href="css/main.css" rel="stylesheet" type="text/css">
+  <link href="icons/style.css" rel="stylesheet" type="text/css">
+
+</head>
+
+<body>
+
+
+  <div class="main">
+    <div class="wrap">
+      <div class="left">
+        <div id="nav"></div>
+      </div>
+      <div class="right">
+        <div class="toolbar">
+          <button id="previous">Previous</button>
+          <button id="next">Next</button>
+        </div>
+        <div id="dp"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DayPilot library -->
+  <script src="js/daypilot/daypilot-all.min.js"></script>
+
+  <script>
+
+    const datePicker = new DayPilot.Navigator("nav", {
+      showMonths: 3,
+      skipMonths: 3,
+      selectMode: "Month",
+      onTimeRangeSelected: args => {
+        calendar.update({
+          start: args.day
+
+        });
+        calendar.events.load("/api/events");
+      }
+    });
+    datePicker.init();
+
+    const calendar = new DayPilot.Month("dp", {
+      eventEndSpec: "Date",
+      eventHeight: 30,
+      eventBarVisible: false,
+      onTimeRangeSelected: async (args) => {
+        const modal = await DayPilot.Modal.prompt("Create a new event:", "Event");
+        calendar.clearSelection();
+        if (modal.canceled) {
+          return;
+        }
+        const params = {
+          start: args.start,
+          end: args.end,
+          text: modal.result,
+          color: '#337DFF'
+        };
+        const { data } = await DayPilot.Http.post('/api/events', params);
+        calendar.events.add(data);
+      },
+      onEventMove: async (args) => {
+        const params = {
+
+          start: args.newStart,
+          end: args.newEnd
+        };
+        const { data } = await DayPilot.Http.post('/api/events/' + args.e.id(), params);
+      },
+      onEventResize: async (args) => {
+        const params = {
+
+          start: args.newStart,
+          end: args.newEnd
+        };
+        const { data } = await DayPilot.Http.post('/api/events/' + args.e.id(), params);
+      },
+      onBeforeEventRender: args => {
+        const color = args.data.color || "#888888";
+        args.data.backColor = DayPilot.ColorUtil.lighter(color);
+        args.data.borderColor = "darker";
+        args.data.fontColor = "#ffffff";
+        args.data.areas = [
+          {
+            top: 6,
+            right: 6,
+            width: 18,
+            height: 18,
+            icon: "icon-triangle-down",
+            visibility: "Visible",
+            action: "ContextMenu",
+            style: "font-size: 12px; background-color: #fff; border: 1px solid #ccc; padding: 2px 2px 0px 2px; cursor:pointer; box-sizing: border-box; border-radius: 15px;"
+          }
+        ];
+      },
+      contextMenu: new DayPilot.Menu({
+        items: [
+          {
+            text: "Delete",
+            onClick: async (args) => {
+              const e = args.source;
+              const params = {
+                id: e.id()
+              };
+
+              const { data } = await DayPilot.Http.delete('/api/events/' + params.id);
+              calendar.events.remove(e);
+            }
+          },
+          {
+            text: "-"
+          },
+          {
+            text: "Blue",
+            icon: "icon icon-blue",
+            color: "#3c78d8",
+            onClick: (args) => {
+              app.updateColor(args.source, args.item.color);
+            }
+          },
+          {
+            text: "Green",
+            icon: "icon icon-green",
+            color: "#13A874",
+            onClick: (args) => {
+              app.updateColor(args.source, args.item.color);
+            }
+          },
+          {
+            text: "Yellow",
+            icon: "icon icon-yellow",
+            color: "#EFB914",
+            onClick: (args) => {
+              app.updateColor(args.source, args.item.color);
+            }
+          },
+          {
+            text: "Red",
+            icon: "icon icon-red",
+            color: "#F03030",
+            onClick: (args) => {
+              app.updateColor(args.source, args.item.color);
+            }
+          }, {
+            text: "Auto",
+            color: "auto",
+            onClick: (args) => {
+              app.updateColor(args.source, args.item.color);
+            }
+          },
+
+        ]
+      })
+    });
+    calendar.init();
+
+    const app = {
+      elements: {
+        previous: document.querySelector("#previous"),
+        next: document.querySelector("#next"),
+      },
+      async updateColor(e, color) {
+        const params = {
+
+          color: color
+        };
+        const { data } = await DayPilot.Http.post('/api/events/' + e.id(), params);
+        e.data.color = color;
+        calendar.events.update(e);
+      },
+      init() {
+        app.elements.previous.addEventListener("click", () => {
+          const current = datePicker.selectionDay;
+          datePicker.select(current.addMonths(-1));
+        });
+        app.elements.next.addEventListener("click", () => {
+          const current = datePicker.selectionDay;
+          datePicker.select(current.addMonths(1));
+        });
+
+        calendar.events.load("/api/events");
+      }
+    };
+
+    app.init();
+
+  </script>
+
+
+  <style>
+    .month_default_event_inner {
+      border-radius: 20px;
+    }
+  </style>
+
+</body>
+
+</html>
